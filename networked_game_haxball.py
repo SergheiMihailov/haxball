@@ -1,8 +1,9 @@
 import pygame
 import math
+import json
 
-# from client import ChatClient
-# import server
+from client import SocketWrapper
+import server
 
 WINDOW_SIZE = (800, 600)
 FIELD_WIDTH = WINDOW_SIZE[0]
@@ -197,6 +198,9 @@ def execute_command(field, player_id, keys_pressed):
             disconnect()
             quit()
             
+client_socket = None
+server_socket = None
+users = {}
 
 def initial_game_state():
     field = Field(FIELD_WIDTH, FIELD_HEIGHT, FIELD_WIDTH/2, FIELD_HEIGHT/2, [], [])
@@ -206,33 +210,52 @@ def initial_game_state():
 def load_from_state(field):
     run_game(field, False)
 
-def join(ip, port):
+def join():
     # Connect to the specified ip and port
-    load_from_state(receive_game_state())
-    return
+    print("Input hostname:")
+    ip = input()
+    print("Input port:")
+    port = input()
+
+    socket = SocketWrapper(ip, port)
+    socket.connect()
+    
+    run_game(load_from_state(receive_game_state()), False)
 
 def on_join(field):
     field.create_player()
 
 def receive_game_state():
-    # Parse state string
-    return
+    res = client_socket.receive().split(", ")
+    return Field(res[0], res[1], res[2], res[3], res[4], res[5], res[6], res[7], res[8])
 
-def send_game_state():
-    # Stringify field state
+def send_game_state(user, field):
+    data_to_send = ",".join([
+        field.field_width,
+        field.field_height,
+        field.ball_x,
+        field.ball_y,
+        field.team_red,
+        field.team_blue,
+        field.score_red,
+        field.score_blue,
+        field.frame
+    ])
+    server_socket.send(data_to_send)
     return
 
 def receive_command(user):
-    # Parse text
-    return None, None
+    command = server_socket.receive().split(",")
+
+    # Parse command (player_id, pygame.key.get_pressed())
+    return command[0], command[1]
     
 def send_command(my_player, keys):
-    return
+    client_socket.send(",".join([my_player,keys]))
 
 def disconnect():
     return
 
-users = {}
 
 def run_game(field, host):
     pygame.init()
@@ -287,6 +310,13 @@ def run_game(field, host):
                 obj.speed.x *= -1.5
             if obj.position.y < obj.radius or obj.position.y > 600-obj.radius:
                 obj.speed.y *= -1.5
+
+        # Send data to users connected
+        if host:
+            for user in users:
+                send_game_state(user, field)
+        else:
+            field = receive_game_state()
         #   Render
         screen.blit(background_image, [-5, 5])
         for obj in field.team_blue:
@@ -304,7 +334,7 @@ def run_game(field, host):
         clock.tick(50)
 
 def ask_host_or_join():
-    print("Would you like to 1. join a game or 2. host a game? (Press 1, 2 or q to quit)")
+    print("Would you like to 1. host a game or 2. join a game? (Press 1, 2 or q to quit)")
     res = input()
     if res == "1":
         return True
@@ -316,7 +346,9 @@ def ask_host_or_join():
         return ask_host_or_join()
     
 host = ask_host_or_join()
+
 if host:
+    # Init server socket
     run_game(initial_game_state(), True)
 else:
-    join(HOSTNAME, PORT)
+    join()
