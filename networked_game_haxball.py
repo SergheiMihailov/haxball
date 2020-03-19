@@ -8,8 +8,8 @@ WINDOW_SIZE = (800, 600)
 FIELD_WIDTH = WINDOW_SIZE[0]
 FIELD_HEIGHT = WINDOW_SIZE[1]
 COLOR_WHITE = (255,255,255)
-COLOR_RED = (255,0,0)
-COLOR_BLUE = (0,0,255)
+COLOR_RED = (255,60,70)
+COLOR_BLUE = (70,60,255)
 COLOR_GRAY = (90,90,90)
 CIRCLE_RADIUS = 20
 
@@ -45,7 +45,7 @@ class Position:
         return "x: " + str(self.x) + ", y: " + str(self.y)
 
 class Field:
-    def __init__(self, field_width, field_height, ball_x, ball_y, team_red=[], team_blue=[], score_red=0, score_blue=0, frame=0):
+    def __init__(self, field_width, field_height, ball_x, ball_y, team_red, team_blue, score_red=0, score_blue=0, frame=0):
         self.width = field_width
         self.height = field_height
 
@@ -132,12 +132,11 @@ def detect_collision(circle_1, circle_2):
         circle_collision(circle_1,circle_2)
 
 def circle_collision(circle_1,circle_2):
-    x_diff = -(circle_1.position.x-circle_2.position.x)
-    y_diff = -(circle_1.position.y-circle_2.position.y)
+    x_diff = -(circle_1.position.x-circle_2.position.x)+0.001
+    y_diff = -(circle_1.position.y-circle_2.position.y)+0.001
 
     resulting_speed_module = (circle_1.speed.module()*circle_1.mass + circle_2.speed.module()*circle_2.mass)/(circle_1.mass+circle_2.mass)
-    x_speed = resulting_speed_module
-    y_speed = 0.001
+    
     if x_diff > 0:
         if y_diff > 0:
             angle = math.degrees(math.atan(y_diff/x_diff))
@@ -178,109 +177,146 @@ def detect_goal(field):
     if field.ball.position.y > field.height/4 + field.ball.radius and field.ball.position.y < field.height*3/4 - field.ball.radius:
         if field.ball.position.x < field.ball.radius:
             field.score_blue += 1
+            field.add_ball()
         elif field.ball.position.x > field.width - field.ball.radius:  
             field.score_red += 1
+            field.add_ball()
 
-# host = False
-
-# if host:
-#     game_server = server.create_server()
-# else: 
-#     game_client = ChatClient(HOSTNAME, PORT)
-#     game_client.connect()
-
-
-# def get_games_from_server():
-#     return game_client.send_and_receive("GET GAMES\n")
-    
-# def create_or_connect(name):
-#     response = game_client.send_and_receive("CREATE-CONNECT "+name)
-
-# print("Games available:")
-# for game in get_games_from_server():
-#     print(game)
-
-# print("Enter the name of an existing game to connect\nEnter a new name to create a new game")
-# create_or_connect(input())
-
-pygame.init()
-pygame.font.init()
-myfont = pygame.font.SysFont('Comic Sans MS', 30)
-
-pygame.display.set_mode()
-background_image = pygame.image.load("field.png").convert()
-
-screen = pygame.display.set_mode(WINDOW_SIZE)
-screen.fill(COLOR_WHITE)
-
-done = False
-is_blue = True
-
-field = Field(FIELD_WIDTH, FIELD_HEIGHT, FIELD_WIDTH/2, FIELD_HEIGHT/2, [], [])
-field.add_ball()
-my_player = field.create_player()
-
-clock = pygame.time.Clock()
-
-# Game loop
-while not done:
-
-    # Events
-    keys = pygame.key.get_pressed()
-    if keys[pygame.K_UP]:
-        field.get_player(my_player).accelerate(Position(0,-1))
-    
-    if keys[pygame.K_DOWN]:
-        field.get_player(my_player).accelerate(Position(0,1))
-    
-    if keys[pygame.K_LEFT]:
-        field.get_player(my_player).accelerate(Position(-1,0))
-    
-    if keys[pygame.K_RIGHT]:
-        field.get_player(my_player).accelerate(Position(1,0))
+def execute_command(field, player_id, keys_pressed):
+    if keys_pressed[pygame.K_UP]:
+        field.get_player(player_id).accelerate(Position(0,-1))
+    if keys_pressed[pygame.K_DOWN]:
+        field.get_player(player_id).accelerate(Position(0,1))
+    if keys_pressed[pygame.K_LEFT]:
+        field.get_player(player_id).accelerate(Position(-1,0))
+    if keys_pressed[pygame.K_RIGHT]:
+        field.get_player(player_id).accelerate(Position(1,0))
 
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
-            done = True
+            disconnect()
+            quit()
+            
 
+def initial_game_state():
+    field = Field(FIELD_WIDTH, FIELD_HEIGHT, FIELD_WIDTH/2, FIELD_HEIGHT/2, [], [])
+    field.add_ball()
+    return field
+
+def load_from_state(field):
+    run_game(field, False)
+
+def join(ip, port):
+    # Connect to the specified ip and port
+    load_from_state(receive_game_state())
+    return
+
+def on_join(field):
+    field.create_player()
+
+def receive_game_state():
+    # Parse state string
+    return
+
+def send_game_state():
+    # Stringify field state
+    return
+
+def receive_command(user):
+    # Parse text
+    return None, None
     
-    # if host:
-    #     received_events = receive_events()
-    # else:
-    #     send_events()
+def send_command(my_player, keys):
+    return
 
-    #   Move
-    for obj in field.team_blue+field.team_red+[field.ball]:
-        obj.move()
+def disconnect():
+    return
 
-    # Detect goal
-    detect_goal(field)
-    # Detect collisions
-    #   With each other
-    for obj_1 in field.team_blue+field.team_red+[field.ball]:
-        for obj_2 in field.team_blue+field.team_red+[field.ball]:
-            if obj_1 != obj_2:
-                detect_collision(obj_1, obj_2)
+users = {}
+
+def run_game(field, host):
+    pygame.init()
+    pygame.font.init()
+    myfont = pygame.font.SysFont('Comic Sans MS', 30)
+
+    pygame.display.set_mode()
+    background_image = pygame.image.load("field.png").convert()
+
+    screen = pygame.display.set_mode(WINDOW_SIZE)
+    screen.fill(COLOR_WHITE)
+
+    done = False
+
+    my_player = field.create_player()
+
+    clock = pygame.time.Clock()
+
+    # Game loop
+    while not done:
+        # Events
+        #   Local events
+        keys = pygame.key.get_pressed()
+
+        if not host:
+            send_command(my_player, keys)
+
+        execute_command(field, my_player, keys)
+
+        #   Others' events:
+        if host:
+            for user in users:
+                player_id, keys_pressed = receive_command(user)
+                execute_command(field, player_id, keys_pressed)
+
+        #   Move
+        for obj in field.team_blue+field.team_red+[field.ball]:
+            obj.move()
+
+        # Detect goal
+        detect_goal(field)
+        # Detect collisions
+        #   With each other
+        for obj_1 in field.team_blue+field.team_red+[field.ball]:
+            for obj_2 in field.team_blue+field.team_red+[field.ball]:
+                if obj_1 != obj_2:
+                    detect_collision(obj_1, obj_2)
+
+        #   With walls
+        for obj in field.team_blue+field.team_red+[field.ball]:
+            if obj.position.x < obj.radius or obj.position.x > 800-obj.radius: 
+                obj.speed.x *= -1.5
+            if obj.position.y < obj.radius or obj.position.y > 600-obj.radius:
+                obj.speed.y *= -1.5
+        #   Render
+        screen.blit(background_image, [-5, 5])
+        for obj in field.team_blue:
+            pygame.draw.circle(screen, COLOR_BLUE, obj.position.to_int_tuple(), 20)
+        for obj in field.team_red:
+            pygame.draw.circle(screen, COLOR_RED, obj.position.to_int_tuple(), 20)
+
+        pygame.draw.circle(screen, COLOR_WHITE, field.ball.position.to_int_tuple(), 20)
+
+        textsurface = myfont.render(str(field.score_red)+" : "+str(field.score_blue), False, COLOR_WHITE)
+        screen.blit(textsurface,(WINDOW_SIZE[0]/2-30,10))
+
+        pygame.display.flip()
+
+        clock.tick(50)
+
+def ask_host_or_join():
+    print("Would you like to 1. join a game or 2. host a game? (Press 1, 2 or q to quit)")
+    res = input()
+    if res == "1":
+        return True
+    if res == "2":
+        return False
+    if res == "q":
+        quit()
+    else:
+        return ask_host_or_join()
     
-    #   With walls
-    for obj in field.team_blue+field.team_red+[field.ball]:
-        if obj.position.x < obj.radius or obj.position.x > 800-obj.radius: 
-            obj.speed.x *= -1.5
-        if obj.position.y < obj.radius or obj.position.y > 600-obj.radius:
-            obj.speed.y *= -1.5
-    #   Render
-    screen.blit(background_image, [-5, 5])
-    for obj in field.team_blue:
-        pygame.draw.circle(screen, COLOR_BLUE, obj.position.to_int_tuple(), 20)
-    for obj in field.team_red:
-        pygame.draw.circle(screen, COLOR_RED, obj.position.to_int_tuple(), 20)
-
-    pygame.draw.circle(screen, COLOR_WHITE, field.ball.position.to_int_tuple(), 20)
-
-    textsurface = myfont.render(str(field.score_red)+" : "+str(field.score_blue), False, COLOR_WHITE)
-    screen.blit(textsurface,(WINDOW_SIZE[0]/2-30,10))
-
-    pygame.display.flip()
-
-    clock.tick(50)
-
+host = ask_host_or_join()
+if host:
+    run_game(initial_game_state(), True)
+else:
+    join(HOSTNAME, PORT)
