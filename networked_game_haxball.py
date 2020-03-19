@@ -1,6 +1,9 @@
 import pygame
 import math
 
+import "client.py"
+import "server.py"
+
 WINDOW_SIZE = (800, 600)
 FIELD_WIDTH = WINDOW_SIZE[0]
 FIELD_HEIGHT = WINDOW_SIZE[1]
@@ -9,6 +12,9 @@ COLOR_RED = (255,0,0)
 COLOR_BLUE = (0,0,255)
 COLOR_GRAY = (90,90,90)
 CIRCLE_RADIUS = 20
+
+HOSTNAME = "18.195.107.195"
+PORT = 5378
 
 class Position:
     def __init__(self, x, y):
@@ -72,8 +78,6 @@ class Field:
 
     def add_ball(self):
         self.ball = Ball(self.POSITION_BALL) 
-
-    
 
 class Player:
     def __init__(self, position):
@@ -163,6 +167,26 @@ def circle_collision(circle_1,circle_2):
     circle_1.speed.x = -x_speed
     circle_1.speed.y = -y_speed
 
+if host:
+    
+else: 
+    game_client = ChatClient(HOSTNAME, PORT)
+    game_client.connect()
+
+
+# def get_games_from_server():
+#     return game_client.send_and_receive("GET GAMES\n")
+    
+# def create_or_connect(name):
+#     response = game_client.send_and_receive("CREATE-CONNECT "+name)
+
+# print("Games available:")
+# for game in get_games_from_server():
+#     print(game)
+
+# print("Enter the name of an existing game to connect\nEnter a new name to create a new game")
+# create_or_connect(input())
+
 pygame.init()
 screen = pygame.display.set_mode(WINDOW_SIZE)
 screen.fill(COLOR_WHITE)
@@ -178,6 +202,7 @@ clock = pygame.time.Clock()
 
 # Game loop
 while not done:
+
     # Events
     keys = pygame.key.get_pressed()
     if keys[pygame.K_UP]:
@@ -195,6 +220,12 @@ while not done:
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             done = True
+
+    
+    if host:
+        received_events = receive_events()
+    else:
+        send_events()
 
     #   Move
     for obj in field.team_blue+field.team_red+[field.ball]:
