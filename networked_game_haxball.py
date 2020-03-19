@@ -1,8 +1,8 @@
 import pygame
 import math
 
-import "client.py"
-import "server.py"
+# from client import ChatClient
+# import server
 
 WINDOW_SIZE = (800, 600)
 FIELD_WIDTH = WINDOW_SIZE[0]
@@ -45,7 +45,7 @@ class Position:
         return "x: " + str(self.x) + ", y: " + str(self.y)
 
 class Field:
-    def __init__(self, field_width, field_height, ball_x, ball_y, team_red=[], team_blue=[]):
+    def __init__(self, field_width, field_height, ball_x, ball_y, team_red=[], team_blue=[], score_red=0, score_blue=0, frame=0):
         self.width = field_width
         self.height = field_height
 
@@ -58,7 +58,12 @@ class Field:
 
         self.team_red = team_red
         self.team_blue = team_blue
+
+        self.score_red = score_red
+        self.score_blue = score_blue
         
+        self.frame = frame
+
     def create_player(self):
         player_id = (None, None)
         if len(self.team_red) >= len(self.team_blue):
@@ -131,6 +136,8 @@ def circle_collision(circle_1,circle_2):
     y_diff = -(circle_1.position.y-circle_2.position.y)
 
     resulting_speed_module = (circle_1.speed.module()*circle_1.mass + circle_2.speed.module()*circle_2.mass)/(circle_1.mass+circle_2.mass)
+    x_speed = resulting_speed_module
+    y_speed = 0.001
     if x_diff > 0:
         if y_diff > 0:
             angle = math.degrees(math.atan(y_diff/x_diff))
@@ -167,11 +174,20 @@ def circle_collision(circle_1,circle_2):
     circle_1.speed.x = -x_speed
     circle_1.speed.y = -y_speed
 
-if host:
-    
-else: 
-    game_client = ChatClient(HOSTNAME, PORT)
-    game_client.connect()
+def detect_goal(field):
+    if field.ball.position.y > field.height/4 + field.ball.radius and field.ball.position.y < field.height*3/4 - field.ball.radius:
+        if field.ball.position.x < field.ball.radius:
+            field.score_blue += 1
+        elif field.ball.position.x > field.width - field.ball.radius:  
+            field.score_red += 1
+
+# host = False
+
+# if host:
+#     game_server = server.create_server()
+# else: 
+#     game_client = ChatClient(HOSTNAME, PORT)
+#     game_client.connect()
 
 
 # def get_games_from_server():
@@ -188,6 +204,12 @@ else:
 # create_or_connect(input())
 
 pygame.init()
+pygame.font.init()
+myfont = pygame.font.SysFont('Comic Sans MS', 30)
+
+pygame.display.set_mode()
+background_image = pygame.image.load("field.png").convert()
+
 screen = pygame.display.set_mode(WINDOW_SIZE)
 screen.fill(COLOR_WHITE)
 
@@ -222,15 +244,17 @@ while not done:
             done = True
 
     
-    if host:
-        received_events = receive_events()
-    else:
-        send_events()
+    # if host:
+    #     received_events = receive_events()
+    # else:
+    #     send_events()
 
     #   Move
     for obj in field.team_blue+field.team_red+[field.ball]:
         obj.move()
 
+    # Detect goal
+    detect_goal(field)
     # Detect collisions
     #   With each other
     for obj_1 in field.team_blue+field.team_red+[field.ball]:
@@ -245,13 +269,16 @@ while not done:
         if obj.position.y < obj.radius or obj.position.y > 600-obj.radius:
             obj.speed.y *= -1.5
     #   Render
-    screen.fill(COLOR_WHITE)
+    screen.blit(background_image, [-5, 5])
     for obj in field.team_blue:
         pygame.draw.circle(screen, COLOR_BLUE, obj.position.to_int_tuple(), 20)
     for obj in field.team_red:
         pygame.draw.circle(screen, COLOR_RED, obj.position.to_int_tuple(), 20)
 
-    pygame.draw.circle(screen, COLOR_GRAY, field.ball.position.to_int_tuple(), 20)
+    pygame.draw.circle(screen, COLOR_WHITE, field.ball.position.to_int_tuple(), 20)
+
+    textsurface = myfont.render(str(field.score_red)+" : "+str(field.score_blue), False, COLOR_WHITE)
+    screen.blit(textsurface,(WINDOW_SIZE[0]/2-30,10))
 
     pygame.display.flip()
 
