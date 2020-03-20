@@ -15,14 +15,13 @@ class Position:
     __rmul__ = __mul__
 
     def __truediv__(self, d):
-        return Position(self.x/d, self.y/d)
+        return Position(self.x / d, self.y/d)
 
     def to_int_tuple(self):
-        return (int(self.x),int(self.y))
+        return (int(self.x), int(self.y))
 
     def module(self):
-        return (self.x**2+self.y**2)**0.5
+        return (self.x ** 2 + self.y ** 2) ** 0.5
 
     def __str__(self):
         return "x: " + str(self.x) + ", y: " + str(self.y)
-        

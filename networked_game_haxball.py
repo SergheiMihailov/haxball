@@ -14,42 +14,45 @@ import threading
 WINDOW_SIZE = (800, 600)
 FIELD_WIDTH = WINDOW_SIZE[0]
 FIELD_HEIGHT = WINDOW_SIZE[1]
-COLOR_WHITE = (255,255,255)
-COLOR_RED = (255,60,70)
-COLOR_BLUE = (70,60,255)
-COLOR_GRAY = (90,90,90)
+COLOR_WHITE = (255, 255, 255)
+COLOR_RED = (255, 60, 70)
+COLOR_BLUE = (70, 60, 255)
+COLOR_GRAY = (90, 90, 90)
 
 HOSTNAME = "127.0.0.1"
 PORT = 1827
 
+
 def detect_collision(circle_1, circle_2):
-    if math.sqrt(((circle_1.position.x-circle_2.position.x)**2)+((circle_1.position.y-circle_2.position.y)**2)) <= (circle_1.radius+circle_2.radius):
-        circle_collision(circle_1,circle_2)
+    if math.sqrt(((circle_1.position.x - circle_2.position.x) ** 2) + ((circle_1.position.y - circle_2.position.y) ** 2)) <= (circle_1.radius + circle_2.radius):
+        circle_collision(circle_1, circle_2)
 
-def circle_collision(circle_1,circle_2):
-    x_diff = -(circle_1.position.x-circle_2.position.x)+0.001
-    y_diff = -(circle_1.position.y-circle_2.position.y)+0.001
 
-    resulting_speed_module = (circle_1.speed.module()*circle_1.mass + circle_2.speed.module()*circle_2.mass)/(circle_1.mass+circle_2.mass)
-    
+def circle_collision(circle_1, circle_2):
+    x_diff = -(circle_1.position.x - circle_2.position.x) + 0.001
+    y_diff = -(circle_1.position.y - circle_2.position.y) + 0.001
+
+    resulting_speed_module = (circle_1.speed.module(
+    )*circle_1.mass + circle_2.speed.module()*circle_2.mass) / (circle_1.mass+circle_2.mass)
+
     if x_diff > 0:
         if y_diff > 0:
-            angle = math.degrees(math.atan(y_diff/x_diff))
-            x_speed = resulting_speed_module*math.cos(math.radians(angle))
-            y_speed = resulting_speed_module*math.sin(math.radians(angle))
+            angle = math.degrees(math.atan(y_diff / x_diff))
+            x_speed = resulting_speed_module * math.cos(math.radians(angle))
+            y_speed = resulting_speed_module * math.sin(math.radians(angle))
         elif y_diff < 0:
-            angle = math.degrees(math.atan(y_diff/x_diff))
-            x_speed = resulting_speed_module*math.cos(math.radians(angle))
-            y_speed = resulting_speed_module*math.sin(math.radians(angle))
+            angle = math.degrees(math.atan(y_diff / x_diff))
+            x_speed = resulting_speed_module * math.cos(math.radians(angle))
+            y_speed = resulting_speed_module * math.sin(math.radians(angle))
     elif x_diff < 0:
         if y_diff > 0:
-            angle = 180 + math.degrees(math.atan(y_diff/x_diff))
-            x_speed = resulting_speed_module*math.cos(math.radians(angle))
-            y_speed = resulting_speed_module*math.sin(math.radians(angle))
+            angle = 180 + math.degrees(math.atan(y_diff / x_diff))
+            x_speed = resulting_speed_module * math.cos(math.radians(angle))
+            y_speed = resulting_speed_module * math.sin(math.radians(angle))
         elif y_diff < 0:
-            angle = -180 + math.degrees(math.atan(y_diff/x_diff))
-            x_speed = resulting_speed_module*math.cos(math.radians(angle))
-            y_speed = resulting_speed_module*math.sin(math.radians(angle))
+            angle = -180 + math.degrees(math.atan(y_diff / x_diff))
+            x_speed = resulting_speed_module * math.cos(math.radians(angle))
+            y_speed = resulting_speed_module * math.sin(math.radians(angle))
     elif x_diff == 0:
         if y_diff > 0:
             angle = -90
@@ -68,35 +71,47 @@ def circle_collision(circle_1,circle_2):
     circle_1.speed.x = -x_speed
     circle_1.speed.y = -y_speed
 
+
 def execute_command(field, player_id, keys_pressed):
     if keys_pressed[pygame.K_UP]:
-        field.get_player(player_id).accelerate(Position(0,-1))
+        field.get_player(player_id).accelerate(Position(0, -1))
     if keys_pressed[pygame.K_DOWN]:
-        field.get_player(player_id).accelerate(Position(0,1))
+        field.get_player(player_id).accelerate(Position(0, 1))
     if keys_pressed[pygame.K_LEFT]:
-        field.get_player(player_id).accelerate(Position(-1,0))
+        field.get_player(player_id).accelerate(Position(-1, 0))
     if keys_pressed[pygame.K_RIGHT]:
-        field.get_player(player_id).accelerate(Position(1,0))
+        field.get_player(player_id).accelerate(Position(1, 0))
 
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             # disconnect()
             quit()
-            
+
+
 def render(screen, field, background_image, myfont):
     screen.blit(background_image, [-5, 5])
+
     for obj in field.team_blue:
         pygame.draw.circle(screen, COLOR_BLUE, obj.position.to_int_tuple(), 20)
+
     for obj in field.team_red:
         pygame.draw.circle(screen, COLOR_RED, obj.position.to_int_tuple(), 20)
-    pygame.draw.circle(screen, COLOR_WHITE, field.ball.position.to_int_tuple(), 20)
-    textsurface = myfont.render(str(field.score_red)+" : "+str(field.score_blue), False, COLOR_WHITE)
-    screen.blit(textsurface,(WINDOW_SIZE[0]/2-30,10))
+
+    pygame.draw.circle(screen, COLOR_WHITE,
+                       field.ball.position.to_int_tuple(), 20)
+    textsurface = myfont.render(
+        str(field.score_red) + " : " + str(field.score_blue), False, COLOR_WHITE)
+    screen.blit(textsurface, (WINDOW_SIZE[0] / 2 - 30, 10))
+
     pygame.display.flip()
 
+
 def initial_game_state():
-    field = Field(FIELD_WIDTH, FIELD_HEIGHT, FIELD_WIDTH/2, FIELD_HEIGHT/2, [], [])
+    field = Field(FIELD_WIDTH, FIELD_HEIGHT,
+                  FIELD_WIDTH/2, FIELD_HEIGHT/2, [], [])
+
     return field
+
 
 is_host = False
 
@@ -108,23 +123,28 @@ field = initial_game_state()
 #   Send events
 #   Receive game state
 
+
 def join():
-#     print("Input hostname:")
-#     ip = input()
-#     print("Input port:")
-#     port = int(input())
+    #     print("Input hostname:")
+    #     ip = input()
+    #     print("Input port:")
+    #     port = int(input())
     ip = HOSTNAME
     port = PORT
 
     client_socket = SocketWrapper(ip, port)
     client_socket.connect()
+
     run_game(field, client_socket)
+
 
 def send_command(my_player, keys, client_socket):
     client_socket.send(jsonpickle.encode((my_player, keys)))
 
+
 def receive_game_state(client_socket):
     res = jsonpickle.decode(client_socket.receive())
+
     return res
 
 # Server side:
@@ -133,20 +153,26 @@ def receive_game_state(client_socket):
 #   Receive events and store them in an object
 #   Send game state
 
+
 def create_server(hostname=HOSTNAME, port=PORT):
+
     server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
-    host_and_port = (hostname, port)
     server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-    server_socket.bind(host_and_port)
 
+    host_and_port = (hostname, port)
+
+    server_socket.bind(host_and_port)
     server_socket.listen()
 
     return server_socket
 
+
 def on_join(socket_wrapper):
     users[socket_wrapper] = ()
+
     field.create_player()
+
 
 def handle_user_connection(connection):
     socket_wrapper = SocketWrapper()
@@ -154,9 +180,10 @@ def handle_user_connection(connection):
 
     on_join(socket_wrapper)
 
+
 def listen_for_clients(server):
     while True:
-        connection, client_address = server.accept()
+        connection, _ = server.accept()
 
         print("New client connected")
 
@@ -165,22 +192,30 @@ def listen_for_clients(server):
 
         receiving_thread.start()
 
+
 def send_game_state(user, field):
     data_to_send = jsonpickle.encode(field)
+
     user.send(data_to_send)
+
 
 def receive_command(server_socket):
     command = server_socket.receive()
     command = jsonpickle.decode(command)
+
     users[server_socket] = command
+
 
 def get_players_events():
     for user in users.keys():
         receive_command(user)
 
+
 def run_game(field, client_socket):
     print("Game ran by host? "+str(is_host))
+
     pygame.init()
+
     pygame.font.init()
     myfont = pygame.font.SysFont('Comic Sans MS', 30)
 
@@ -191,7 +226,7 @@ def run_game(field, client_socket):
     screen.fill(COLOR_WHITE)
 
     done = False
-    
+
     if not is_host:
         send_command(None, pygame.key.get_pressed(), client_socket)
         field = receive_game_state(client_socket)
@@ -211,29 +246,34 @@ def run_game(field, client_socket):
             send_command(my_player, keys, client_socket)
 
         execute_command(field, my_player, keys)
+
         #   Others' events:
         if is_host:
             get_players_events()
+
             for command in users.values():
                 if len(command) == 2:
                     execute_command(field, command[0], command[1])
+
         #   Move
-        for obj in field.team_blue+field.team_red+[field.ball]:
+        for obj in field.team_blue + field.team_red + [field.ball]:
             obj.move()
+
         # Detect goal
         field.detect_goal()
 
         # Detect collisions
         #   With each other
-        for obj_1 in field.team_blue+field.team_red+[field.ball]:
-            for obj_2 in field.team_blue+field.team_red+[field.ball]:
+        for obj_1 in field.team_blue + field.team_red + [field.ball]:
+            for obj_2 in field.team_blue + field.team_red + [field.ball]:
                 if obj_1 != obj_2:
                     detect_collision(obj_1, obj_2)
+
         #   With walls
-        for obj in field.team_blue+field.team_red+[field.ball]:
-            if obj.position.x < obj.radius or obj.position.x > 800-obj.radius: 
+        for obj in field.team_blue + field.team_red+[field.ball]:
+            if obj.position.x < obj.radius or obj.position.x > 800 - obj.radius:
                 obj.speed.x *= -1.5
-            if obj.position.y < obj.radius or obj.position.y > 600-obj.radius:
+            if obj.position.y < obj.radius or obj.position.y > 600 - obj.radius:
                 obj.speed.y *= -1.5
 
         # Send data to users connected
@@ -242,15 +282,18 @@ def run_game(field, client_socket):
                 send_game_state(user, field)
         else:
             field = receive_game_state(client_socket)
-        
+
         #   Render
         render(screen, field, background_image, myfont)
 
         clock.tick(50)
 
+
 def ask_host_or_join():
     print("Would you like to 1. host a game or 2. join a game? (Press 1, 2 or q to quit)")
+
     res = input()
+
     if res == "1":
         return True
     if res == "2":
@@ -259,16 +302,18 @@ def ask_host_or_join():
         quit()
     else:
         return ask_host_or_join()
-    
+
+
 is_host = ask_host_or_join()
 
 if is_host:
     # Init server socket
     server_socket = create_server()
+
     listening_thread = threading.Thread(
         target=listen_for_clients, args=([server_socket]))
-
     listening_thread.start()
+
     run_game(field, None)
 else:
     join()
