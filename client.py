@@ -31,12 +31,12 @@ class SocketWrapper:
         self.hostname = hostname
         self.port = port
 
-    def connect(self, socket=None):
-        if socket == None:
+    def connect(self, client_socket=None):
+        if client_socket == None:
             self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             self.socket.connect((self.hostname, self.port))
         else:
-            self.socket = socket
+            self.socket = client_socket
 
     def disconnect(self):
         self.receiving_buffer = ""
@@ -129,14 +129,13 @@ def handle_user_connection(connection):
     socket_wrapper = SocketWrapper()
     socket_wrapper.connect(connection)
 
+    # Do something
+    # on_join(socket_wrapper)
+
     while True:
         message = socket_wrapper.receive_and_retry()
 
         print(message)
-
-        # Do something
-
-        socket_wrapper.send_and_retry('HI THERE')
 
 def listen_for_clients(server):
     while True:

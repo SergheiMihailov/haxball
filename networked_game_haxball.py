@@ -3,7 +3,13 @@ import math
 import json
 
 from client import SocketWrapper
-import server
+from position import Position
+from player import Player
+from ball import Ball
+from field import Field
+import client
+import socket
+import threading
 
 WINDOW_SIZE = (800, 600)
 FIELD_WIDTH = WINDOW_SIZE[0]
@@ -12,121 +18,9 @@ COLOR_WHITE = (255,255,255)
 COLOR_RED = (255,60,70)
 COLOR_BLUE = (70,60,255)
 COLOR_GRAY = (90,90,90)
-CIRCLE_RADIUS = 20
 
-HOSTNAME = "18.195.107.195"
-PORT = 5378
-
-class Position:
-    def __init__(self, x, y):
-        self.x = x
-        self.y = y
-
-    def __add__(self, position):
-        return Position(self.x + position.x, self.y + position.y)
-
-    def __sub__(self, position):
-        return Position(self.x + position.x, self.y + position.y)
-
-    def __mul__(self, m):
-        return Position(self.x * m, self.y * m)
-
-    __rmul__ = __mul__
-
-    def __truediv__(self, d):
-        return Position(self.x/d, self.y/d)
-
-    def to_int_tuple(self):
-        return (int(self.x),int(self.y))
-
-    def module(self):
-        return (self.x**2+self.y**2)**0.5
-
-    def __str__(self):
-        return "x: " + str(self.x) + ", y: " + str(self.y)
-
-class Field:
-    def __init__(self, field_width, field_height, ball_x, ball_y, team_red, team_blue, score_red=0, score_blue=0, frame=0):
-        self.width = field_width
-        self.height = field_height
-
-        self.POSITION_RED = Position(self.width/4, self.height/2)
-        self.POSITION_BLUE = Position(self.width*3/4, self.height/2)
-        self.POSITION_BALL = Position(self.width/2, self.height/2)
-
-        # self.ball = Ball(Position(self.width/2, self.height/2))
-        self.ball = Ball(Position(ball_x, ball_y))
-
-        self.team_red = team_red
-        self.team_blue = team_blue
-
-        self.score_red = score_red
-        self.score_blue = score_blue
-        
-        self.frame = frame
-
-    def create_player(self):
-        player_id = (None, None)
-        if len(self.team_red) >= len(self.team_blue):
-            player_id = ("red", len(self.team_red))
-            self.team_red.append(Player(self.POSITION_RED))
-        else:
-            player_id = ("blue", len(self.team_blue))
-            self.team_blue.append(Player(self.POSITION_BLUE))
-        return player_id
-
-    def get_player(self, player_id):
-        num = player_id[1]
-        if player_id[0] == "blue":
-            return self.team_blue[num]
-        elif player_id[0] == "red":
-            return self.team_red[num]
-
-    def add_ball(self):
-        self.ball = Ball(self.POSITION_BALL) 
-
-class Player:
-    def __init__(self, position):
-        self.position = position
-        self.speed = Position(0,0)
-        self.max_speed = 5
-        self.radius = CIRCLE_RADIUS
-        self.mass = 70
-    
-    def accelerate(self, d_speed):
-        self.speed += d_speed*0.5
-        if (self.speed.module() > self.max_speed):
-            self.speed *= self.max_speed / self.speed.module()
-
-    def decelerate(self):
-        if self.speed.module() > 0:
-            self.accelerate(-0.6*Position(self.speed.x, self.speed.y)/self.speed.module())
-        
-    def move(self):
-        self.position += Position(self.speed.x, self.speed.y)
-        self.decelerate()
-
-class Ball:
-    def __init__(self, position):
-        self.position = position
-        self.speed = Position(0,0)
-        self.max_speed = 5
-        self.radius = CIRCLE_RADIUS
-        self.mass = 10
-    
-    def accelerate(self, d_speed):
-        self.speed += d_speed*0.1
-        if (self.speed.module() > self.max_speed):
-            self.speed *= self.max_speed / self.speed.module()
-
-    def decelerate(self):
-        if self.speed.module() > 0:
-            self.accelerate(-0.6*Position(self.speed.x, self.speed.y)/self.speed.module())
-
-    def move(self):
-        self.position += Position(self.speed.x, self.speed.y)
-        self.decelerate()
-        
+HOSTNAME = "127.0.0.1"
+PORT = 1827
 
 def detect_collision(circle_1, circle_2):
     if math.sqrt(((circle_1.position.x-circle_2.position.x)**2)+((circle_1.position.y-circle_2.position.y)**2)) <= (circle_1.radius+circle_2.radius):
@@ -174,15 +68,6 @@ def circle_collision(circle_1,circle_2):
     circle_1.speed.x = -x_speed
     circle_1.speed.y = -y_speed
 
-def detect_goal(field):
-    if field.ball.position.y > field.height/4 + field.ball.radius and field.ball.position.y < field.height*3/4 - field.ball.radius:
-        if field.ball.position.x < field.ball.radius:
-            field.score_blue += 1
-            field.add_ball()
-        elif field.ball.position.x > field.width - field.ball.radius:  
-            field.score_red += 1
-            field.add_ball()
-
 def execute_command(field, player_id, keys_pressed):
     if keys_pressed[pygame.K_UP]:
         field.get_player(player_id).accelerate(Position(0,-1))
@@ -193,71 +78,105 @@ def execute_command(field, player_id, keys_pressed):
     if keys_pressed[pygame.K_RIGHT]:
         field.get_player(player_id).accelerate(Position(1,0))
 
-    for event in pygame.event.get():
-        if event.type == pygame.QUIT:
-            disconnect()
-            quit()
+    # for event in pygame.event.get():
+    #     if event.type == pygame.QUIT:
+    #         disconnect()
+    #         quit()
             
-client_socket = None
-server_socket = None
-users = {}
-
 def initial_game_state():
     field = Field(FIELD_WIDTH, FIELD_HEIGHT, FIELD_WIDTH/2, FIELD_HEIGHT/2, [], [])
-    field.add_ball()
     return field
 
-def load_from_state(field):
-    run_game(field, False)
+is_host = False
+
+users = set()
+field = initial_game_state()
+
+# Client side:
+#   Initialize socket and connect
+#   Send events
+#   Receive game state
 
 def join():
-    # Connect to the specified ip and port
-    print("Input hostname:")
-    ip = input()
-    print("Input port:")
-    port = input()
+#     print("Input hostname:")
+#     ip = input()
+#     print("Input port:")
+#     port = int(input())
+    ip = HOSTNAME
+    port = PORT
 
-    socket = SocketWrapper(ip, port)
-    socket.connect()
+    client_socket = SocketWrapper(ip, port)
+    client_socket.connect()
     
-    run_game(load_from_state(receive_game_state()), False)
+    run_game(field, client_socket)
 
-def on_join(field):
+def send_command(my_player, keys, client_socket):
+    client_socket.send(json.dumps((my_player, keys)))
+
+def receive_game_state(client_socket):
+    res = json.loads(client_socket.receive())
+    return res
+
+# Server side:
+#   Initialize server
+#   Listen for connections
+#   Receive events and store them in an object
+#   Send game state
+
+def create_server(hostname=HOSTNAME, port=PORT):
+    server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+
+    host_and_port = (hostname, port)
+    server_socket.bind(host_and_port)
+
+    server_socket.listen()
+
+    return server_socket
+
+def on_join(socket_wrapper):
+    users.add(socket_wrapper)
     field.create_player()
 
-def receive_game_state():
-    res = client_socket.receive().split(", ")
-    return Field(res[0], res[1], res[2], res[3], res[4], res[5], res[6], res[7], res[8])
+def handle_user_connection(connection):
+    socket_wrapper = SocketWrapper()
+    socket_wrapper.connect(connection)
+
+    on_join(socket_wrapper)
+
+    while True:
+        message = socket_wrapper.receive_and_retry()
+
+        print(message)
+
+def listen_for_clients(server):
+    while True:
+        connection, client_address = server.accept()
+
+        print("New client connected")
+
+        receiving_thread = threading.Thread(
+            target=handle_user_connection, args=([connection]))
+
+        receiving_thread.start()
 
 def send_game_state(user, field):
-    data_to_send = ",".join([
-        field.field_width,
-        field.field_height,
-        field.ball_x,
-        field.ball_y,
-        field.team_red,
-        field.team_blue,
-        field.score_red,
-        field.score_blue,
-        field.frame
-    ])
+    data_to_send = json.dumps(field)
     server_socket.send(data_to_send)
-    return
 
-def receive_command(user):
-    command = server_socket.receive().split(",")
+def receive_command(server_socket):
+    command = server_socket.receive()
+    command = json.loads(command)
 
     # Parse command (player_id, pygame.key.get_pressed())
     return command[0], command[1]
-    
-def send_command(my_player, keys):
-    client_socket.send(",".join([my_player,keys]))
 
-def disconnect():
-    return
+def get_players_events():
+    for user in users:
+        player_id, keys_pressed = receive_command(user)
+        execute_command(field, player_id, keys_pressed)
 
-
-def run_game(field, host):
+def run_game(field, client_socket):
+    print("Game ran by host? "+str(is_host))
     pygame.init()
     pygame.font.init()
     myfont = pygame.font.SysFont('Comic Sans MS', 30)
@@ -269,7 +188,7 @@ def run_game(field, host):
     screen.fill(COLOR_WHITE)
 
     done = False
-
+    
     my_player = field.create_player()
 
     clock = pygame.time.Clock()
@@ -280,30 +199,27 @@ def run_game(field, host):
         #   Local events
         keys = pygame.key.get_pressed()
 
-        if not host:
-            send_command(my_player, keys)
+        if not is_host:
+            send_command(my_player, keys, client_socket)
 
         execute_command(field, my_player, keys)
 
         #   Others' events:
-        if host:
-            for user in users:
-                player_id, keys_pressed = receive_command(user)
-                execute_command(field, player_id, keys_pressed)
-
+        if is_host:
+            get_players_events()
         #   Move
         for obj in field.team_blue+field.team_red+[field.ball]:
             obj.move()
 
         # Detect goal
-        detect_goal(field)
+        field.detect_goal()
+
         # Detect collisions
         #   With each other
         for obj_1 in field.team_blue+field.team_red+[field.ball]:
             for obj_2 in field.team_blue+field.team_red+[field.ball]:
                 if obj_1 != obj_2:
                     detect_collision(obj_1, obj_2)
-
         #   With walls
         for obj in field.team_blue+field.team_red+[field.ball]:
             if obj.position.x < obj.radius or obj.position.x > 800-obj.radius: 
@@ -312,11 +228,12 @@ def run_game(field, host):
                 obj.speed.y *= -1.5
 
         # Send data to users connected
-        if host:
+        if is_host:
             for user in users:
                 send_game_state(user, field)
         else:
-            field = receive_game_state()
+            field = receive_game_state(client_socket)
+
         #   Render
         screen.blit(background_image, [-5, 5])
         for obj in field.team_blue:
@@ -345,10 +262,12 @@ def ask_host_or_join():
     else:
         return ask_host_or_join()
     
-host = ask_host_or_join()
+is_host = ask_host_or_join()
 
-if host:
+if is_host:
     # Init server socket
-    run_game(initial_game_state(), True)
+    server_socket = create_server()
+    listen_for_clients(server_socket)
+    # run_game(field, None)
 else:
     join()
