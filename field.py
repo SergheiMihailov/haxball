@@ -26,7 +26,7 @@ class Field:
 
     def create_player(self):
         player_id = (None, None)
-        if len(self.team_red) >= len(self.team_blue):
+        if len(self.team_red) <= len(self.team_blue):
             player_id = ("red", len(self.team_red))
             self.team_red.append(Player(self.POSITION_RED, CIRCLE_RADIUS))
         else:
@@ -41,8 +41,16 @@ class Field:
         elif player_id[0] == "red":
             return self.team_red[num]
 
+    def get_last_created_player_id(self):
+        print("Red"+str(self.team_red))
+        print("Blue"+str(self.team_blue))
+        if len(self.team_red) < len(self.team_blue):
+            return ("red", len(self.team_red)-1)
+        else:
+            return ("blue", len(self.team_blue)-1)
+
     def add_ball(self):
-        self.ball = Ball(self.POSITION_BALL) 
+        self.ball = Ball(self.POSITION_BALL, CIRCLE_RADIUS) 
     
     def detect_goal(self):
         if self.ball.position.y > self.height/4 + self.ball.radius and self.ball.position.y < self.height*3/4 - self.ball.radius:

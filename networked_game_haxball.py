@@ -1,6 +1,6 @@
 import pygame
 import math
-import json
+import jsonpickle
 
 from client import SocketWrapper
 from position import Position
@@ -78,18 +78,29 @@ def execute_command(field, player_id, keys_pressed):
     if keys_pressed[pygame.K_RIGHT]:
         field.get_player(player_id).accelerate(Position(1,0))
 
-    # for event in pygame.event.get():
-    #     if event.type == pygame.QUIT:
-    #         disconnect()
-    #         quit()
+    for event in pygame.event.get():
+        if event.type == pygame.QUIT:
+            # disconnect()
+            quit()
             
+def render(screen, field, background_image, myfont):
+    screen.blit(background_image, [-5, 5])
+    for obj in field.team_blue:
+        pygame.draw.circle(screen, COLOR_BLUE, obj.position.to_int_tuple(), 20)
+    for obj in field.team_red:
+        pygame.draw.circle(screen, COLOR_RED, obj.position.to_int_tuple(), 20)
+    pygame.draw.circle(screen, COLOR_WHITE, field.ball.position.to_int_tuple(), 20)
+    textsurface = myfont.render(str(field.score_red)+" : "+str(field.score_blue), False, COLOR_WHITE)
+    screen.blit(textsurface,(WINDOW_SIZE[0]/2-30,10))
+    pygame.display.flip()
+
 def initial_game_state():
     field = Field(FIELD_WIDTH, FIELD_HEIGHT, FIELD_WIDTH/2, FIELD_HEIGHT/2, [], [])
     return field
 
 is_host = False
 
-users = set()
+users = {}
 field = initial_game_state()
 
 # Client side:
@@ -107,14 +118,13 @@ def join():
 
     client_socket = SocketWrapper(ip, port)
     client_socket.connect()
-    
     run_game(field, client_socket)
 
 def send_command(my_player, keys, client_socket):
-    client_socket.send(json.dumps((my_player, keys)))
+    client_socket.send(jsonpickle.encode((my_player, keys)))
 
 def receive_game_state(client_socket):
-    res = json.loads(client_socket.receive())
+    res = jsonpickle.decode(client_socket.receive())
     return res
 
 # Server side:
@@ -127,6 +137,7 @@ def create_server(hostname=HOSTNAME, port=PORT):
     server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
     host_and_port = (hostname, port)
+    server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     server_socket.bind(host_and_port)
 
     server_socket.listen()
@@ -134,7 +145,7 @@ def create_server(hostname=HOSTNAME, port=PORT):
     return server_socket
 
 def on_join(socket_wrapper):
-    users.add(socket_wrapper)
+    users[socket_wrapper] = ()
     field.create_player()
 
 def handle_user_connection(connection):
@@ -142,11 +153,6 @@ def handle_user_connection(connection):
     socket_wrapper.connect(connection)
 
     on_join(socket_wrapper)
-
-    while True:
-        message = socket_wrapper.receive_and_retry()
-
-        print(message)
 
 def listen_for_clients(server):
     while True:
@@ -160,20 +166,17 @@ def listen_for_clients(server):
         receiving_thread.start()
 
 def send_game_state(user, field):
-    data_to_send = json.dumps(field)
-    server_socket.send(data_to_send)
+    data_to_send = jsonpickle.encode(field)
+    user.send(data_to_send)
 
 def receive_command(server_socket):
     command = server_socket.receive()
-    command = json.loads(command)
-
-    # Parse command (player_id, pygame.key.get_pressed())
-    return command[0], command[1]
+    command = jsonpickle.decode(command)
+    users[server_socket] = command
 
 def get_players_events():
-    for user in users:
-        player_id, keys_pressed = receive_command(user)
-        execute_command(field, player_id, keys_pressed)
+    for user in users.keys():
+        receive_command(user)
 
 def run_game(field, client_socket):
     print("Game ran by host? "+str(is_host))
@@ -189,7 +192,12 @@ def run_game(field, client_socket):
 
     done = False
     
-    my_player = field.create_player()
+    if not is_host:
+        send_command(None, pygame.key.get_pressed(), client_socket)
+        field = receive_game_state(client_socket)
+        my_player = field.get_last_created_player_id()
+    else:
+        my_player = field.create_player()
 
     clock = pygame.time.Clock()
 
@@ -203,14 +211,15 @@ def run_game(field, client_socket):
             send_command(my_player, keys, client_socket)
 
         execute_command(field, my_player, keys)
-
         #   Others' events:
         if is_host:
             get_players_events()
+            for command in users.values():
+                if len(command) == 2:
+                    execute_command(field, command[0], command[1])
         #   Move
         for obj in field.team_blue+field.team_red+[field.ball]:
             obj.move()
-
         # Detect goal
         field.detect_goal()
 
@@ -229,24 +238,13 @@ def run_game(field, client_socket):
 
         # Send data to users connected
         if is_host:
-            for user in users:
+            for user in users.keys():
                 send_game_state(user, field)
         else:
             field = receive_game_state(client_socket)
-
+        
         #   Render
-        screen.blit(background_image, [-5, 5])
-        for obj in field.team_blue:
-            pygame.draw.circle(screen, COLOR_BLUE, obj.position.to_int_tuple(), 20)
-        for obj in field.team_red:
-            pygame.draw.circle(screen, COLOR_RED, obj.position.to_int_tuple(), 20)
-
-        pygame.draw.circle(screen, COLOR_WHITE, field.ball.position.to_int_tuple(), 20)
-
-        textsurface = myfont.render(str(field.score_red)+" : "+str(field.score_blue), False, COLOR_WHITE)
-        screen.blit(textsurface,(WINDOW_SIZE[0]/2-30,10))
-
-        pygame.display.flip()
+        render(screen, field, background_image, myfont)
 
         clock.tick(50)
 
@@ -267,7 +265,10 @@ is_host = ask_host_or_join()
 if is_host:
     # Init server socket
     server_socket = create_server()
-    listen_for_clients(server_socket)
-    # run_game(field, None)
+    listening_thread = threading.Thread(
+        target=listen_for_clients, args=([server_socket]))
+
+    listening_thread.start()
+    run_game(field, None)
 else:
     join()

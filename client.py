@@ -135,8 +135,6 @@ def handle_user_connection(connection):
     while True:
         message = socket_wrapper.receive_and_retry()
 
-        print(message)
-
 def listen_for_clients(server):
     while True:
         connection, client_address = server.accept()
@@ -155,8 +153,6 @@ def listen_for_clients(server):
 def handle_server_connection(socket):
     while True:
         message = socket.receive_and_retry()
-
-        print(message)
 
         # Do something
 
