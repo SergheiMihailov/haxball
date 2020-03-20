@@ -42,8 +42,6 @@ class Field:
             return self.team_red[num]
 
     def get_last_created_player_id(self):
-        print("Red"+str(self.team_red))
-        print("Blue"+str(self.team_blue))
         if len(self.team_red) >= len(self.team_blue)+1:
             return ("red", len(self.team_red)-1)
         else:
